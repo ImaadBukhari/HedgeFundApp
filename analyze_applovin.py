@@ -512,7 +512,7 @@ def plot_distribution(strikes: np.ndarray, density: np.ndarray, spot: float,
 # =============================================================================
 
 def main():
-    ticker = "SLV"
+    ticker = "JPM"
     output_dir = "output/distributions"
     
     import os
