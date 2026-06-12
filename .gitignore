@@ -31,3 +31,19 @@ dist-ssr
 *.gz
 *.png
 *.pyc
+
+# Python
+venv/
+backend/venv/
+__pycache__/
+*.pyo
+*.pyd
+*.pkl
+*.joblib
+.Python
+pip-log.txt
+
+# Generated outputs
+trades/output/
+kalman_ml_pairs_output/
+nav_series.csv
