@@ -46,4 +46,5 @@ pip-log.txt
 # Generated outputs
 trades/output/
 kalman_ml_pairs_output/
+backtest_output/
 nav_series.csv

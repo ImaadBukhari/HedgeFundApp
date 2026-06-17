@@ -63,7 +63,9 @@ def load_trades():
             "ticker":     t["ticker"],
             "action":     t["action"],
             "amount_usd": float(t["amount_usd"]),
+            "amount_cad": float(t.get("amount_cad", t["amount_usd"])),
             "currency":   t.get("currency", "CAD"),
+            "shares":     t.get("shares"),  # explicit override; None = infer from price
         })
     return sorted(rows, key=lambda x: x["date"])
 
@@ -127,7 +129,11 @@ def build_positions(trades, price_histories):
             continue
 
         price  = get_price_on_date(hist.dropna(), dt)
-        shares = amt / price if price > 0 else 0.0
+        if t.get("shares") is not None:
+            shares = float(t["shares"])
+        else:
+            amt_for_shares = t.get("amount_cad", amt) if tk.endswith(".TO") else amt
+            shares = amt_for_shares / price if price > 0 else 0.0
 
         pos = positions.setdefault(tk, dict(
             shares=0, total_cost=0, realized_pnl=0, dividends=0))
