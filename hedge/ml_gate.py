@@ -96,6 +96,7 @@ def train_classifier(train_df: pd.DataFrame,
         min_child_weight=8,
         random_state=42,
         tree_method="hist",
+        n_jobs=1,            # single-threaded → deterministic, reproducible runs
         enable_categorical=False,
         use_label_encoder=False,
         eval_metric="logloss",
