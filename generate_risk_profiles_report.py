@@ -473,6 +473,33 @@ def optimize_profile(profile_name, meta, port_ret, spy_ret, vix, gate_data):
 
 EXCLUDED = {"AMD_PUT"}
 
+def xirr(cashflows):
+    """Annualised money-weighted IRR (XIRR) from dated (date, amount) cashflows.
+    Sign convention: money OUT (buys) negative, money IN (sells, divs, final NAV)
+    positive. Solved by bisection on NPV. Returns nan if no sign change brackets.
+    """
+    if not cashflows:
+        return float("nan")
+    d0 = min(d for d, _ in cashflows)
+    def npv(rate):
+        return sum(cf / (1.0 + rate) ** ((d - d0).days / 365.0)
+                   for d, cf in cashflows)
+    lo, hi = -0.9999, 100.0
+    flo, fhi = npv(lo), npv(hi)
+    if flo * fhi > 0:
+        return float("nan")          # no bracketed root
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        fm  = npv(mid)
+        if abs(fm) < 1e-7:
+            return mid
+        if flo * fm < 0:
+            hi, fhi = mid, fm
+        else:
+            lo, flo = mid, fm
+    return 0.5 * (lo + hi)
+
+
 def personal_portfolio_metrics():
     """Loads trades.json and returns summary metrics dict."""
     if not TRADES_FILE.exists():
@@ -571,7 +598,10 @@ def personal_portfolio_metrics():
     calmar_v = cagr_v / abs(max_dd_v) if max_dd_v < 0 else float("nan")
     var95_v  = float(r.quantile(0.05))
     cvar95_v = float(r[r <= var95_v].mean())
-    total_inv = sum(t["amount_usd"] for t in trades if t["action"] == "buy")
+    gross_buys  = sum(t["amount_usd"] for t in trades if t["action"] == "buy")
+    gross_sells = sum(t["amount_usd"] for t in trades if t["action"] == "sell")
+    dividends   = sum(t["amount_usd"] for t in trades if t["action"] == "dividend")
+    net_invested = gross_buys - gross_sells
 
     first_date = min(t["date"] for t in trades).date()
     last_date  = nav.index[-1].date()
@@ -585,12 +615,35 @@ def personal_portfolio_metrics():
         if sh_held > 0.001:
             current_mkt += sh_held * float(h.dropna().iloc[-1])
 
+    # Cash reconciliation — ties NAV back to capital flows so the headline
+    # numbers can't be misread (NAV < gross buys simply because cash was sold out).
+    total_pnl = current_mkt + gross_sells + dividends - gross_buys
+
+    # Money-weighted IRR (XIRR): actual dated cashflows + final NAV as a liquidating
+    # inflow. Buys are cash out (−), sells/divs are cash in (+).
+    cashflows = []
+    for t in trades:
+        amt = t["amount_usd"]
+        if t["action"] == "buy":
+            cashflows.append((t["date"], -amt))
+        elif t["action"] == "sell":
+            cashflows.append((t["date"], +amt))
+        elif t["action"] == "dividend":
+            cashflows.append((t["date"], +amt))
+    cashflows.append((pd.Timestamp(last_date), +current_mkt))
+    irr_v = xirr(cashflows)
+
     return {
         "period_start": str(first_date),
         "period_end":   str(last_date),
         "n_trades":     len(trades),
-        "total_invested": total_inv,
+        "gross_buys":   gross_buys,
+        "gross_sells":  gross_sells,
+        "net_invested": net_invested,
+        "dividends":    dividends,
+        "total_pnl":    total_pnl,
         "current_nav":  current_mkt,
+        "irr":          irr_v,
         "cagr":         cagr_v,
         "vol":          vol_v,
         "sharpe":       sharpe_v,
@@ -841,16 +894,40 @@ def write_markdown(all_results, optimised_params, personal_metrics, correlations
     lines += ["## Personal Portfolio Performance\n"]
     if personal_metrics:
         pm = personal_metrics
+        net_pct = pm['total_pnl'] / pm['net_invested'] if pm['net_invested'] else float('nan')
         lines += [
             f"**Period:** {pm['period_start']} → {pm['period_end']}  "
-            f"|  **Trades:** {pm['n_trades']}  "
-            f"|  **Total invested:** ${pm['total_invested']:,.0f}  "
-            f"|  **Current NAV:** ${pm['current_nav']:,.0f}\n",
+            f"|  **Trades:** {pm['n_trades']}\n",
+            "#### Capital Reconciliation\n",
+            "Capital was rotated heavily (positions bought, sold and re-bought), so "
+            "gross buys overstate the money actually at risk. The table below ties "
+            "current NAV back to cash flows.\n",
+            "| Cash flow | Amount |",
+            "|-----------|--------|",
+            f"| Gross buys (all purchases) | ${pm['gross_buys']:,.0f} |",
+            f"| Less: proceeds from sells | −${pm['gross_sells']:,.0f} |",
+            f"| **Net invested (capital at risk)** | **${pm['net_invested']:,.0f}** |",
+            f"| Dividends received | ${pm['dividends']:,.0f} |",
+            f"| Current NAV (holdings still held) | ${pm['current_nav']:,.0f} |",
+            f"| **Total P&L** (NAV + sells + divs − buys) | **${pm['total_pnl']:+,.0f}** "
+            f"({net_pct*100:+.1f}% on net invested) |\n",
+            "> **Why NAV (${:,.0f}) is below gross buys (${:,.0f}):** ${:,.0f} of "
+            "stock was already sold and converted back to cash, so it no longer "
+            "appears in NAV. Against the **${:,.0f} actually kept at risk**, the book "
+            "is **up ${:+,.0f}**.\n".format(
+                pm['current_nav'], pm['gross_buys'], pm['gross_sells'],
+                pm['net_invested'], pm['total_pnl']),
+            "#### Risk-Adjusted Performance\n",
+            "**IRR** (money-weighted / XIRR) annualises the actual dated cashflows "
+            "— buys, sells, dividends and the final NAV — so it reflects the return "
+            "on capital *as actually deployed and timed*.  Total Return is "
+            "time-weighted (TWR), which strips out cashflow timing; the two differ "
+            "by design and neither equals NAV ÷ invested.\n",
             "| Metric | Value |",
             "|--------|-------|",
-            f"| CAGR (TWR) | **{pct(pm['cagr'])}** |",
+            f"| **IRR (money-weighted, annualised)** | **{pct(pm['irr'])}** |",
+            f"| Total Return (TWR) | {pct(pm['total_return'])} |",
             f"| Annualised Volatility | {pct_plain(pm['vol'])} |",
-            f"| Total Return | {pct(pm['total_return'])} |",
             f"| Sharpe Ratio | **{pm['sharpe']:.4f}** |",
             f"| Sortino Ratio | {pm['sortino']:.4f} |",
             f"| Calmar Ratio | {pm['calmar']:.4f} |",
@@ -1161,7 +1238,8 @@ def main():
     print("\nComputing personal portfolio metrics…")
     personal_metrics = personal_portfolio_metrics()
     if personal_metrics:
-        print(f"  Personal CAGR={personal_metrics['cagr']:+.1%}  "
+        print(f"  Personal IRR={personal_metrics['irr']:+.1%}  "
+              f"TWR={personal_metrics['total_return']:+.1%}  "
               f"Sharpe={personal_metrics['sharpe']:.3f}  "
               f"MaxDD={personal_metrics['max_dd']:.1%}")
     else:

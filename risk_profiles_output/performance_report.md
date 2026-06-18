@@ -1,25 +1,44 @@
 # Quantitative Hedge Fund — Performance Report
-**Generated:** 2026-06-16 21:35  |  **Risk-free rate:** 4.5% p.a.  |  **Hedge instrument:** SPY short (Kalman time-varying beta)
+**Generated:** 2026-06-17 20:21  |  **Risk-free rate:** 4.5% p.a.  |  **Hedge instrument:** SPY short (Kalman time-varying beta)
 
 ---
 
 ## Personal Portfolio Performance
 
-**Period:** 2025-09-30 → 2026-06-16  |  **Trades:** 79  |  **Total invested:** $12,985  |  **Current NAV:** $9,881
+**Period:** 2025-09-30 → 2026-06-17  |  **Trades:** 79
+
+#### Capital Reconciliation
+
+Capital was rotated heavily (positions bought, sold and re-bought), so gross buys overstate the money actually at risk. The table below ties current NAV back to cash flows.
+
+| Cash flow | Amount |
+|-----------|--------|
+| Gross buys (all purchases) | $12,985 |
+| Less: proceeds from sells | −$5,684 |
+| **Net invested (capital at risk)** | **$7,301** |
+| Dividends received | $6 |
+| Current NAV (holdings still held) | $10,040 |
+| **Total P&L** (NAV + sells + divs − buys) | **$+2,745** (+37.6% on net invested) |
+
+> **Why NAV ($10,040) is below gross buys ($12,985):** $5,684 of stock was already sold and converted back to cash, so it no longer appears in NAV. Against the **$7,301 actually kept at risk**, the book is **up $+2,745**.
+
+#### Risk-Adjusted Performance
+
+**IRR** (money-weighted / XIRR) annualises the actual dated cashflows — buys, sells, dividends and the final NAV — so it reflects the return on capital *as actually deployed and timed*.  Total Return is time-weighted (TWR), which strips out cashflow timing; the two differ by design and neither equals NAV ÷ invested.
 
 | Metric | Value |
 |--------|-------|
-| CAGR (TWR) | **+87.5%** |
-| Annualised Volatility | 48.4% |
-| Total Return | +57.1% |
-| Sharpe Ratio | **1.4474** |
-| Sortino Ratio | 2.1038 |
-| Calmar Ratio | 3.3027 |
+| **IRR (money-weighted, annualised)** | **+82.6%** |
+| Total Return (TWR) | +59.6% |
+| Annualised Volatility | 48.3% |
+| Sharpe Ratio | **1.4884** |
+| Sortino Ratio | 2.1585 |
+| Calmar Ratio | 3.4360 |
 | Max Drawdown | -26.5% |
-| VaR 95% (daily) | -4.877% |
+| VaR 95% (daily) | -4.849% |
 | CVaR 95% (daily) | -6.628% |
-| Return Skewness | 0.0026 |
-| Return Kurtosis (excess) | 1.8902 |
+| Return Skewness | -0.0042 |
+| Return Kurtosis (excess) | 1.9070 |
 | Best Day | +12.60% |
 | Worst Day | -10.49% |
 
